@@ -18,50 +18,29 @@ class ProfileBot extends Bot {
 
     async start() {
 
-        this.messenger = await this.ready;
+        //this.messenger = await this.ready;
         this.tasks = await db.tasks.getAll();
         this.users = await this.getUsers();
 
-        console.log(this.users);
         const tasksUserIds = this.tasks.map(task => task.user_id);
 
+        console.log(this.users);
+
         for(const [userId, user] of this.users) {
+
+            if(!userId) continue;
+
             if(tasksUserIds.indexOf(userId) !== -1) {
                 this.users.delele(userId);
             }
             else {
                 if(Object.keys(user.extensions).length === 0) {
                     // Отправляем меню "Начать и Позже"
-                    await this.sendInteractiveMessage(
-                        { type: 'user', id: userId },
-                        `Добрый день, я автоматизированный помощник, помогу вам заполнить профиль. 
-                        С заполненным профилем потенциальный партнер найдет вас быстрее и больше людей смогут узнать о ваших услугах. 
-                        В среднем заполнение профиля занимает не больше 2 минут. Начнем?`,
-                        [
-                            {
-                                id: `begin`,
-                                widget: {
-                                    type: 'button',
-                                    label: 'Начать',
-                                    value: 'begin'
-                                }
-                            },
-                            {
-                                id: `later`,
-
-                            }
-                        ]
-                    )
+                    await this.sendStartMenu(userId, user);
                 }
                 else {
                     // Продолжаем опрос
-                    const question = this.findCurrentQuestion(user);
-
-                    if (question) {
-                        await this.messenger.findUsers(user.query);
-                        await this.sendTextMessage({ userId, type: 'user' }, question.text);
-                        //await Promise.delay(1000);
-                    }
+                    await this.sendNextQuestion(userId, user)
                 }
             }
         }
@@ -78,16 +57,69 @@ class ProfileBot extends Bot {
 
     }
 
-    async sendStartMenu(userId) {
+    async sendNextQuestion(userId, user) {
+        const question = this.findCurrentQuestion(user);
 
+        if (question) {
+            await this.messenger.findUsers(user.query);
+            await this.sendTextMessage({ userId, type: 'user' }, question.text);
+            //await Promise.delay(1000);
+        }
+    }
+
+    async sendStartMenu(userId, user) {
+        const messenger = await this.ready;
+        const u = await messenger.findUsers(user.query);
+
+        console.log(u);
+
+        await this.sendInteractiveMessage(
+            { type: 'user', id: userId },
+            `Добрый день, я автоматизированный помощник, помогу вам заполнить профиль. 
+            С заполненным профилем потенциальный партнер найдет вас быстрее и больше людей смогут узнать о ваших услугах. 
+            В среднем заполнение профиля занимает не больше 2 минут. Начнем?`,
+            [
+                {
+                    actions: [
+                        {
+                            id: `begin`,
+                            widget: {
+                                type: 'button',
+                                label: 'Начать',
+                                value: 'begin'
+                            }
+                        },
+                        {
+                            id: `later`,
+                            widget: {
+                                type: 'button',
+                                label: 'Позже',
+                                value: 'later'
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
     }
 
     async sendTimeMenu(userId) {
 
     }
 
+    onInteractiveEvent() {
+        super.onInteractiveEvent(async event => {
+
+            console.log(event)
+
+        })
+    }
+
     onMessage() {
         super.onMessage(async ({ peer, content }) => {
+
+            console.log(content.type);
+
             if (peer.type !== 'user' || content.type !== 'text') {
                 return;
             }
@@ -151,6 +183,8 @@ class ProfileBot extends Bot {
             }
         );
 
+        //console.log(JSON.stringify(result));
+
         const items = result.users.edges.map((user) => {
             const id = parseInt(user.node.id, 10);
             return [id, {
@@ -203,16 +237,9 @@ class ProfileBot extends Bot {
         return config.questions.find((item) => !user.extensions[item.id]);
     }
 
-    async getTasks() {
-
-
-
-    }
-
-    async setTask() {
-
-
-
+    async setTask(userId, hours) {
+        const task = await db.tasks.setTask(userId, Date.now() + hours * 3600);
+        this.tasks.push(task);
     }
 
     async deleteTask(id) {
