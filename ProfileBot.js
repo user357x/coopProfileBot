@@ -9,28 +9,25 @@ const onError = require('./onError');
 class ProfileBot extends Bot {
 
     constructor(...args) {
-
         super(...args);
-        this.messenger = undefined;
         this.users = undefined;
         this.tasks = undefined;
-
     }
 
     async start() {
 
-        this.messenger = await this.ready;
         this.tasks = await this.getTasks();
         this.users = await this.getUsers();
         const myId = await this.getUid();
 
         this.users.delete(0);
         this.users.delete(myId);
-        this.tasks.forEach(task => this.users.delele(task.user_id));
+
+        for(const [_, task] of this.tasks) {
+            this.users.delete(parseInt(task.user_id))
+        }
 
         await Promise.delay(3000);
-
-        console.log("myId", myId);
 
         for(const [userId, user] of this.users) {
             if(Object.keys(user.extensions).length === 0) {
@@ -39,26 +36,40 @@ class ProfileBot extends Bot {
             }
             else {
                 // Продолжаем опрос
-                await this.sendNextQuestion(userId, user)
+                await this.sendNextQuestion(userId)
             }
         }
 
         this.onInteractiveEvent(async event => {
+            switch(event.value) {
+                case 'begin':
+                    await this.sendNextQuestion(event.uid);
+                    break;
 
-            console.log(event);
+                case 'later':
+                    await this.sendTimeMenu(event.uid);
+                    break;
 
-            if(event.value === 'later') {
-                console.log("LATER", event.uid);
-                await this.sendTimeMenu(event.uid, this.users.get(event.uid));
-            }
-            else if(event.value === 'begin') {
-                //await this.sendNextQuestion(event.uid, this.users.get(event.uid))
+                case 'one_hour':
+                    await this.setTask(event.uid, 1);
+                    break;
+
+                case 'three_hour':
+                    await this.setTask(event.uid, 3);
+                    break;
+
+                case 'seven_hours':
+                    await this.setTask(event.uid, 7);
+                    break;
+
+                case 'twenty_four_hours':
+                    await this.setTask(event.uid, 24);
+                    break;
             }
         });
 
         this.onMessage(async ({ peer, content }) => {
-
-            console.log(content.type);
+            //console.log(content.type);
 
             if (peer.type !== 'user' || content.type !== 'text') {
                 return;
@@ -69,14 +80,13 @@ class ProfileBot extends Bot {
                 return;
             }
 
-            const question = this.findCurrentQuestion(user);
-            if (!question) {
+            const currentQuestion = this.findCurrentQuestion(user);
+            if (!currentQuestion) {
                 return;
             }
 
-            await this.updateUserExtension(peer.id, question.id, content.text);
+            await this.updateUserExtension(peer.id, currentQuestion.id, content.text);
 
-            user.extensions[question.id] = content.text;
             let message;
 
             const nextQuestion = this.findCurrentQuestion(user);
@@ -102,14 +112,15 @@ class ProfileBot extends Bot {
             await this.sendTextMessage({ id: peer.id, type: 'user' }, message);
         });
 
+
         const self = this;
         setTimeout(async function check() {
             try{
                 const now = Date.now();
 
                 for(const [taskId, task] of self.tasks) {
-                    if(task.time >= now) {
-                        await this.sendStartMenu(task.user_id);
+                    if(task.time <= now) {
+                        await self.sendStartMenu(parseInt(task.user_id));
                         await self.deleteTask(taskId);
                     }
                 }
@@ -123,12 +134,11 @@ class ProfileBot extends Bot {
 
     }
 
-    async sendNextQuestion(userId, user) {
-        const question = this.findCurrentQuestion(user);
+    async sendNextQuestion(userId) {
+        const question = this.findCurrentQuestion(this.users.get(userId));
 
         if (question) {
-            await this.messenger.findUsers(user.query);
-            await this.sendTextMessage({ userId, type: 'user' }, question.text);
+            await this.sendTextMessage({ id: userId, type: 'user' }, question.text);
             //await Promise.delay(1000);
         }
     }
@@ -164,10 +174,9 @@ class ProfileBot extends Bot {
         );
     }
 
-    async sendTimeMenu(userId, user) {
-        //await this.messenger.findUsers(user.query);
+    async sendTimeMenu(userId) {
         await this.sendInteractiveMessage(
-            { type: 'user', id: userId },
+            { id: userId, type: 'user' },
             `Через какое время напомнить?`,
             [
                 {
@@ -177,7 +186,7 @@ class ProfileBot extends Bot {
                             widget: {
                                 type: 'button',
                                 label: '1 час',
-                                value: 1
+                                value: 'one_hour'
                             }
                         },
                         {
@@ -185,7 +194,16 @@ class ProfileBot extends Bot {
                             widget: {
                                 type: 'button',
                                 label: '3 часа',
-                                value: 3
+                                value: 'three_hours'
+                            }
+                        },
+                        /*
+                        {
+                            id: `seven_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '7 часов',
+                                value: 'seven_hours'
                             }
                         },
                         {
@@ -193,7 +211,7 @@ class ProfileBot extends Bot {
                             widget: {
                                 type: 'button',
                                 label: '7 часов',
-                                value: 7
+                                value: 'seven_hours'
                             }
                         },
                         {
@@ -201,9 +219,10 @@ class ProfileBot extends Bot {
                             widget: {
                                 type: 'button',
                                 label: '24 часа',
-                                value: 24
+                                value: 'twenty_four_hours'
                             }
                         }
+                        */
                     ]
                 }
             ]
@@ -229,8 +248,6 @@ class ProfileBot extends Bot {
                 }`
             }
         );
-
-        //console.log(JSON.stringify(result));
 
         const items = result.users.edges.map((user) => {
             const id = parseInt(user.node.id, 10);
@@ -278,6 +295,7 @@ class ProfileBot extends Bot {
             }`,
             variables: { uid, about }
         });
+        this.users.delete(uid);
     }
 
     async updateUserExtension(uid, key, value) {
@@ -290,7 +308,7 @@ class ProfileBot extends Bot {
     }
 
     async setTask(userId, hours) {
-        const task = await db.tasks.setTask(userId, Date.now() + hours * 3600);
+        const task = await db.tasks.setTask(userId, Date.now() + hours * 3600 * 1000);
         this.tasks.set(task.id, task);
     }
 
