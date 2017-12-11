@@ -3,8 +3,9 @@
   "version": "0.0.1",
   "dependencies": {
     "@dlghq/dialog-api-utils": "latest",
-    "@dlghq/dialog-bot-sdk": "^1.0.1",
+    "@dlghq/dialog-bot-sdk": "^1.0.2",
     "@dlghq/dialog-node-client": "latest",
+    "bluebird": "^3.5.1",
     "dotenv": "^4.0.0",
     "pg-promise": "^7.3.2",
     "raven": "^2.2.1"

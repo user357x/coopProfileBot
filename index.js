@@ -9,7 +9,22 @@ const init = {
     password: config.bot.password
 };
 
+
+//const bot = new ProfileBot(init);
+
+//bot.start().catch(onError);
+
+/*bot.onInteractiveEvent(async event => {
+
+    console.log(event)
+
+});*/
+
+
+
 new ProfileBot(init).start().catch(onError);
+
+
 
 /*
 const { Bot } = require('@dlghq/dialog-bot-sdk');

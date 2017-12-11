@@ -1,5 +1,6 @@
 const { GraphQLClient } = require('@dlghq/dialog-api-utils');
 const { Bot } = require('@dlghq/dialog-node-client');
+const Promise = require('bluebird');
 const config = require('./config');
 const gql = new GraphQLClient(config.graphql);
 const db = require('./postgres')(config.postgres);
@@ -11,43 +12,48 @@ class ProfileBot extends Bot {
 
         super(...args);
         this.messenger = undefined;
-        this.users = [];
-        this.tasks = [];
+        this.users = undefined;
+        this.tasks = undefined;
 
     }
 
     async start() {
 
-        //this.messenger = await this.ready;
-        this.tasks = await db.tasks.getAll();
+        this.messenger = await this.ready;
+        this.tasks = await this.getTasks();
         this.users = await this.getUsers();
+        const myId = await this.getUid();
 
-        const tasksUserIds = this.tasks.map(task => task.user_id);
+        //console.log(this.users);
 
-        console.log(this.users);
+        this.users.delete(0);
+        this.users.delete(myId);
+        this.tasks.forEach(task => this.users.delele(task.user_id));
 
+        await Promise.delay(10000);
         for(const [userId, user] of this.users) {
-
-            if(!userId) continue;
-
-            if(tasksUserIds.indexOf(userId) !== -1) {
-                this.users.delele(userId);
+            if(Object.keys(user.extensions).length === 0) {
+                // Отправляем меню "Начать и Позже"
+                await this.sendStartMenu(userId, user);
             }
             else {
-                if(Object.keys(user.extensions).length === 0) {
-                    // Отправляем меню "Начать и Позже"
-                    await this.sendStartMenu(userId, user);
-                }
-                else {
-                    // Продолжаем опрос
-                    await this.sendNextQuestion(userId, user)
-                }
+                // Продолжаем опрос
+                await this.sendNextQuestion(userId, user)
             }
         }
 
+        const self = this;
         setTimeout(async function check() {
             try{
-                //console.log(Date.now());
+                const now = Date.now();
+
+                for(const [taskId, task] of self.tasks) {
+                    if(task.time >= now) {
+                        await this.sendStartMenu(task.user_id);
+                        await self.deleteTask(taskId);
+                    }
+                }
+
                 setTimeout(check, config.checkInterval);
             }
             catch (error) {
@@ -68,11 +74,52 @@ class ProfileBot extends Bot {
     }
 
     async sendStartMenu(userId, user) {
-        const messenger = await this.ready;
-        const u = await messenger.findUsers(user.query);
+        //await this.messenger.findUsers(user.query);
+        await this.sendInteractiveMessage(
+            { type: 'user', id: userId },
+            `Через какое время напомнить?`,
+            [
+                {
+                    actions: [
+                        {
+                            id: `one_hour`,
+                            widget: {
+                                type: 'button',
+                                label: '1 час',
+                                value: 1
+                            }
+                        },
+                        {
+                            id: `three_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '3 часа',
+                                value: 3
+                            }
+                        },
+                        {
+                            id: `seven_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '7 часов',
+                                value: 7
+                            }
+                        },
+                        {
+                            id: `twenty_four_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '24 часа',
+                                value: 24
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
+    }
 
-        console.log(u);
-
+    async sendTimeMenu(userId) {
         await this.sendInteractiveMessage(
             { type: 'user', id: userId },
             `Добрый день, я автоматизированный помощник, помогу вам заполнить профиль. 
@@ -103,17 +150,13 @@ class ProfileBot extends Bot {
         );
     }
 
-    async sendTimeMenu(userId) {
-
-    }
-
-    onInteractiveEvent() {
+    /*onInteractiveEvent() {
         super.onInteractiveEvent(async event => {
 
             console.log(event)
 
         })
-    }
+    }*/
 
     onMessage() {
         super.onMessage(async ({ peer, content }) => {
@@ -197,6 +240,11 @@ class ProfileBot extends Bot {
         return new Map(items);
     }
 
+    async getTasks() {
+        const tasks = await db.tasks.getAll();
+        return new Map(tasks.map(task => [task.id, task]))
+    }
+
     async addUserExtension(uid, key, value) {
         await gql.graphql({
             query: `mutation ($uid: ID!, $key: String!, $value: String!) {
@@ -239,12 +287,12 @@ class ProfileBot extends Bot {
 
     async setTask(userId, hours) {
         const task = await db.tasks.setTask(userId, Date.now() + hours * 3600);
-        this.tasks.push(task);
+        this.tasks.set(task.id, task);
     }
 
     async deleteTask(id) {
         await db.tasks.deleteTask(id);
-        this.tasks = this.tasks.filter(task => task.id !== id)
+        this.tasks.delete(id)
     }
 
     onError() {
