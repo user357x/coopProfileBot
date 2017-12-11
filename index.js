@@ -9,21 +9,22 @@ const init = {
     password: config.bot.password
 };
 
+//new ProfileBot(init).start().catch(onError);
 
-//const bot = new ProfileBot(init);
-
-//bot.start().catch(onError);
+const bot = new ProfileBot(init);
+bot.start(init).catch(onError);
 
 /*bot.onInteractiveEvent(async event => {
 
     console.log(event)
+    if(event.value === 'later') {
+        await this.sendTimeMenu(event.uid)
+    }
+    else if(event.value === 'begin') {
+
+    }
 
 });*/
-
-
-
-new ProfileBot(init).start().catch(onError);
-
 
 
 /*

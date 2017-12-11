@@ -24,17 +24,18 @@ class ProfileBot extends Bot {
         this.users = await this.getUsers();
         const myId = await this.getUid();
 
-        //console.log(this.users);
-
         this.users.delete(0);
         this.users.delete(myId);
         this.tasks.forEach(task => this.users.delele(task.user_id));
 
-        await Promise.delay(10000);
+        await Promise.delay(3000);
+
+        console.log("myId", myId);
+
         for(const [userId, user] of this.users) {
             if(Object.keys(user.extensions).length === 0) {
                 // Отправляем меню "Начать и Позже"
-                await this.sendStartMenu(userId, user);
+                await this.sendStartMenu(userId);
             }
             else {
                 // Продолжаем опрос
@@ -42,124 +43,20 @@ class ProfileBot extends Bot {
             }
         }
 
-        const self = this;
-        setTimeout(async function check() {
-            try{
-                const now = Date.now();
+        this.onInteractiveEvent(async event => {
 
-                for(const [taskId, task] of self.tasks) {
-                    if(task.time >= now) {
-                        await this.sendStartMenu(task.user_id);
-                        await self.deleteTask(taskId);
-                    }
-                }
+            console.log(event);
 
-                setTimeout(check, config.checkInterval);
+            if(event.value === 'later') {
+                console.log("LATER", event.uid);
+                await this.sendTimeMenu(event.uid, this.users.get(event.uid));
             }
-            catch (error) {
-                onError(error)
+            else if(event.value === 'begin') {
+                //await this.sendNextQuestion(event.uid, this.users.get(event.uid))
             }
-        }, config.checkInterval);
+        });
 
-    }
-
-    async sendNextQuestion(userId, user) {
-        const question = this.findCurrentQuestion(user);
-
-        if (question) {
-            await this.messenger.findUsers(user.query);
-            await this.sendTextMessage({ userId, type: 'user' }, question.text);
-            //await Promise.delay(1000);
-        }
-    }
-
-    async sendStartMenu(userId, user) {
-        //await this.messenger.findUsers(user.query);
-        await this.sendInteractiveMessage(
-            { type: 'user', id: userId },
-            `Через какое время напомнить?`,
-            [
-                {
-                    actions: [
-                        {
-                            id: `one_hour`,
-                            widget: {
-                                type: 'button',
-                                label: '1 час',
-                                value: 1
-                            }
-                        },
-                        {
-                            id: `three_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '3 часа',
-                                value: 3
-                            }
-                        },
-                        {
-                            id: `seven_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '7 часов',
-                                value: 7
-                            }
-                        },
-                        {
-                            id: `twenty_four_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '24 часа',
-                                value: 24
-                            }
-                        }
-                    ]
-                }
-            ]
-        );
-    }
-
-    async sendTimeMenu(userId) {
-        await this.sendInteractiveMessage(
-            { type: 'user', id: userId },
-            `Добрый день, я автоматизированный помощник, помогу вам заполнить профиль. 
-            С заполненным профилем потенциальный партнер найдет вас быстрее и больше людей смогут узнать о ваших услугах. 
-            В среднем заполнение профиля занимает не больше 2 минут. Начнем?`,
-            [
-                {
-                    actions: [
-                        {
-                            id: `begin`,
-                            widget: {
-                                type: 'button',
-                                label: 'Начать',
-                                value: 'begin'
-                            }
-                        },
-                        {
-                            id: `later`,
-                            widget: {
-                                type: 'button',
-                                label: 'Позже',
-                                value: 'later'
-                            }
-                        }
-                    ]
-                }
-            ]
-        );
-    }
-
-    /*onInteractiveEvent() {
-        super.onInteractiveEvent(async event => {
-
-            console.log(event)
-
-        })
-    }*/
-
-    onMessage() {
-        super.onMessage(async ({ peer, content }) => {
+        this.onMessage(async ({ peer, content }) => {
 
             console.log(content.type);
 
@@ -203,7 +100,114 @@ class ProfileBot extends Bot {
             }
 
             await this.sendTextMessage({ id: peer.id, type: 'user' }, message);
-        })
+        });
+
+        const self = this;
+        setTimeout(async function check() {
+            try{
+                const now = Date.now();
+
+                for(const [taskId, task] of self.tasks) {
+                    if(task.time >= now) {
+                        await this.sendStartMenu(task.user_id);
+                        await self.deleteTask(taskId);
+                    }
+                }
+
+                setTimeout(check, config.checkInterval);
+            }
+            catch (error) {
+                onError(error)
+            }
+        }, config.checkInterval);
+
+    }
+
+    async sendNextQuestion(userId, user) {
+        const question = this.findCurrentQuestion(user);
+
+        if (question) {
+            await this.messenger.findUsers(user.query);
+            await this.sendTextMessage({ userId, type: 'user' }, question.text);
+            //await Promise.delay(1000);
+        }
+    }
+
+    async sendStartMenu(userId) {
+        await this.sendInteractiveMessage(
+            { id: userId, type: 'user' },
+            `Добрый день, я автоматизированный помощник, помогу вам заполнить профиль. 
+            С заполненным профилем потенциальный партнер найдет вас быстрее и больше людей смогут узнать о ваших услугах. 
+            В среднем заполнение профиля занимает не больше 2 минут. Начнем?`,
+            [
+                {
+                    actions: [
+                        {
+                            id: `begin`,
+                            widget: {
+                                type: 'button',
+                                label: 'Начать',
+                                value: 'begin'
+                            }
+                        },
+                        {
+                            id: `later`,
+                            widget: {
+                                type: 'button',
+                                label: 'Позже',
+                                value: 'later'
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
+    }
+
+    async sendTimeMenu(userId, user) {
+        //await this.messenger.findUsers(user.query);
+        await this.sendInteractiveMessage(
+            { type: 'user', id: userId },
+            `Через какое время напомнить?`,
+            [
+                {
+                    actions: [
+                        {
+                            id: `one_hour`,
+                            widget: {
+                                type: 'button',
+                                label: '1 час',
+                                value: 1
+                            }
+                        },
+                        {
+                            id: `three_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '3 часа',
+                                value: 3
+                            }
+                        },
+                        {
+                            id: `seven_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '7 часов',
+                                value: 7
+                            }
+                        },
+                        {
+                            id: `twenty_four_hours`,
+                            widget: {
+                                type: 'button',
+                                label: '24 часа',
+                                value: 24
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
     }
 
     async getUsers() {
