@@ -23,9 +23,7 @@ class ProfileBot extends Bot {
         this.users.delete(0);
         this.users.delete(myId);
 
-        for(const [_, task] of this.tasks) {
-            this.users.delete(parseInt(task.user_id))
-        }
+        this.tasks.forEach(task => this.users.delete(task.userId), this);
 
         await Promise.delay(3000);
 
@@ -54,7 +52,7 @@ class ProfileBot extends Bot {
                     await this.setTask(event.uid, 1);
                     break;
 
-                case 'three_hour':
+                case 'three_hours':
                     await this.setTask(event.uid, 3);
                     break;
 
@@ -112,7 +110,12 @@ class ProfileBot extends Bot {
             await this.sendTextMessage({ id: peer.id, type: 'user' }, message);
         });
 
+        this.on('error', onError);
 
+        this.startCheckTimer();
+    }
+
+    startCheckTimer() {
         const self = this;
         setTimeout(async function check() {
             try{
@@ -120,7 +123,7 @@ class ProfileBot extends Bot {
 
                 for(const [taskId, task] of self.tasks) {
                     if(task.time <= now) {
-                        await self.sendStartMenu(parseInt(task.user_id));
+                        await self.sendStartMenu(task.userId);
                         await self.deleteTask(taskId);
                     }
                 }
@@ -131,7 +134,6 @@ class ProfileBot extends Bot {
                 onError(error)
             }
         }, config.checkInterval);
-
     }
 
     async sendNextQuestion(userId) {
@@ -263,7 +265,7 @@ class ProfileBot extends Bot {
 
     async getTasks() {
         const tasks = await db.tasks.getAll();
-        return new Map(tasks.map(task => [task.id, task]))
+        return new Map(tasks.map(task => [task.id, task.data]))
     }
 
     async addUserExtension(uid, key, value) {
@@ -308,17 +310,13 @@ class ProfileBot extends Bot {
     }
 
     async setTask(userId, hours) {
-        const task = await db.tasks.setTask(userId, Date.now() + hours * 3600 * 1000);
-        this.tasks.set(task.id, task);
+        const task = await db.tasks.setTask({ userId: userId, time: Date.now() + hours * 30 * 1000 });
+        this.tasks.set(task.id, task.data);
     }
 
     async deleteTask(id) {
         await db.tasks.deleteTask(id);
         this.tasks.delete(id)
-    }
-
-    onError() {
-        super.onError(onError);
     }
 
 }
