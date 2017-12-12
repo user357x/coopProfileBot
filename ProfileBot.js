@@ -50,18 +50,22 @@ class ProfileBot extends Bot {
 
                 case 'one_hour':
                     await this.setTask(event.uid, 1);
+                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 1 час`);
                     break;
 
                 case 'three_hours':
                     await this.setTask(event.uid, 3);
+                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 3 часа`);
                     break;
 
                 case 'seven_hours':
                     await this.setTask(event.uid, 7);
+                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 7 часов`);
                     break;
 
                 case 'twenty_four_hours':
                     await this.setTask(event.uid, 24);
+                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 24 часа`);
                     break;
             }
         });
