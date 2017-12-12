@@ -310,7 +310,7 @@ class ProfileBot extends Bot {
     }
 
     async setTask(userId, hours) {
-        const task = await db.tasks.setTask({ userId: userId, time: Date.now() + hours * 30 * 1000 });
+        const task = await db.tasks.setTask({ userId: userId, time: Date.now() + hours * 3600 * 1000 });
         this.tasks.set(task.id, task.data);
     }
 
