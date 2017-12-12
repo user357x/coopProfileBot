@@ -67,8 +67,6 @@ class ProfileBot extends Bot {
         });
 
         this.onMessage(async ({ peer, content }) => {
-            //console.log(content.type);
-
             if (peer.type !== 'user' || content.type !== 'text') {
                 return;
             }
@@ -199,8 +197,7 @@ class ProfileBot extends Bot {
                                 value: 'three_hours'
                             }
                         },
-                        /*
-                        {
+                        /*{
                             id: `seven_hours`,
                             widget: {
                                 type: 'button',
