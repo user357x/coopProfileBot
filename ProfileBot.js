@@ -4,7 +4,7 @@ const Promise = require('bluebird');
 const config = require('./config');
 const gql = new GraphQLClient(config.graphql);
 const db = require('./postgres')(config.postgres);
-const { onMessage, onEvent, onError } = require('./handlers');
+const { onMessage, onInteractiveEvent, onError } = require('./handlers');
 
 class ProfileBot extends Bot {
 
@@ -39,13 +39,13 @@ class ProfileBot extends Bot {
         }
 
         this.onMessage(onMessage(this));
-        this.onInteractiveEvent(onEvent(this));
+        this.onInteractiveEvent(onInteractiveEvent(this));
         this.on('error', onError);
 
-        this.startCheckTimer();
+        this.startCheckTimer(config.checkInterval);
     }
 
-    startCheckTimer() {
+    startCheckTimer(checkInterval) {
         const self = this;
         setTimeout(async function check() {
             try{
@@ -58,12 +58,12 @@ class ProfileBot extends Bot {
                     }
                 }
 
-                setTimeout(check, config.checkInterval);
+                setTimeout(check, checkInterval);
             }
             catch (error) {
                 onError(error)
             }
-        }, config.checkInterval);
+        }, checkInterval);
     }
 
     async sendNextQuestion(userId) {
