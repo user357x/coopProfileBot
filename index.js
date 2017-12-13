@@ -1,5 +1,5 @@
 const config = require('./config');
-const onError = require('./onError');
+const { onError } = require('./handlers');
 const ProfileBot = require('./ProfileBot');
 
 const init = {

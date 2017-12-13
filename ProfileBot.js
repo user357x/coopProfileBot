@@ -4,7 +4,7 @@ const Promise = require('bluebird');
 const config = require('./config');
 const gql = new GraphQLClient(config.graphql);
 const db = require('./postgres')(config.postgres);
-const onError = require('./onError');
+const { onMessage, onEvent, onError } = require('./handlers');
 
 class ProfileBot extends Bot {
 
@@ -38,80 +38,8 @@ class ProfileBot extends Bot {
             }
         }
 
-        this.onInteractiveEvent(async event => {
-            switch(event.value) {
-                case 'begin':
-                    await this.sendNextQuestion(event.uid);
-                    break;
-
-                case 'later':
-                    await this.sendTimeMenu(event.uid);
-                    break;
-
-                case 'one_hour':
-                    await this.setTask(event.uid, 1);
-                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 1 час`);
-                    break;
-
-                case 'three_hours':
-                    await this.setTask(event.uid, 3);
-                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 3 часа`);
-                    break;
-
-                case 'seven_hours':
-                    await this.setTask(event.uid, 7);
-                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 7 часов`);
-                    break;
-
-                case 'twenty_four_hours':
-                    await this.setTask(event.uid, 24);
-                    await this.sendTextMessage({ id: event.uid, type: 'user' }, `Хорошо, мы напомним вам через 24 часа`);
-                    break;
-            }
-        });
-
-        this.onMessage(async ({ peer, content }) => {
-            if (peer.type !== 'user' || content.type !== 'text') {
-                return;
-            }
-
-            const user = this.users.get(peer.id);
-            if (!user) {
-                return;
-            }
-
-            const currentQuestion = this.findCurrentQuestion(user);
-            if (!currentQuestion) {
-                return;
-            }
-
-            await this.updateUserExtension(peer.id, currentQuestion.id, content.text);
-
-            let message;
-
-            const nextQuestion = this.findCurrentQuestion(user);
-            if (nextQuestion) {
-                message = nextQuestion.text;
-            }
-            else {
-                const about = [
-                    `ФИО: ${user.extensions.surname} ${user.extensions.name} ${user.extensions.patronymic}`,
-                    `Регион: ${user.extensions.region}`,
-                    `Работа: ${user.extensions.career} ${user.extensions.position}`
-                ].join('\n');
-
-                await this.updateUserAbout(peer.id, about);
-
-                message = [
-                    'Спасибо, что уделили время.',
-                    'Ваш профиль:',
-                    about
-                ].join('\n');
-            }
-
-            await this.sendTextMessage({ id: peer.id, type: 'user' }, message);
-        });
-
+        this.onMessage(onMessage(this));
+        this.onInteractiveEvent(onEvent(this));
         this.on('error', onError);
 
         this.startCheckTimer();
@@ -186,46 +114,34 @@ class ProfileBot extends Bot {
                 {
                     actions: [
                         {
-                            id: `one_hour`,
+                            id: 'timeMenu',
+                            defaultValue: 'default',
                             widget: {
-                                type: 'button',
-                                label: '1 час',
-                                value: 'one_hour'
-                            }
-                        },
-                        {
-                            id: `three_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '3 часа',
-                                value: 'three_hours'
-                            }
-                        },
-                        /*{
-                            id: `seven_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '7 часов',
-                                value: 'seven_hours'
-                            }
-                        },
-                        {
-                            id: `seven_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '7 часов',
-                                value: 'seven_hours'
-                            }
-                        },
-                        {
-                            id: `twenty_four_hours`,
-                            widget: {
-                                type: 'button',
-                                label: '24 часа',
-                                value: 'twenty_four_hours'
+                                type: 'select',
+                                options: [
+                                    {
+                                        label: 'выберите время',
+                                        value: 'default'
+                                    },
+                                    {
+                                        label: '1 час',
+                                        value: 'one_hour'
+                                    },
+                                    {
+                                        label: '3 часа',
+                                        value: 'three_hours'
+                                    },
+                                    {
+                                        label: '7 часов',
+                                        value: 'seven_hours'
+                                    },
+                                    {
+                                        label: '24 часа',
+                                        value: 'twenty_four_hours'
+                                    }
+                                ]
                             }
                         }
-                        */
                     ]
                 }
             ]
@@ -311,7 +227,7 @@ class ProfileBot extends Bot {
     }
 
     async setTask(userId, hours) {
-        const task = await db.tasks.setTask({ userId: userId, time: Date.now() + hours * 3600 * 1000 });
+        const task = await db.tasks.setTask({ userId: userId, time: Date.now() + hours * 10 * 1000 });
         this.tasks.set(task.id, task.data);
     }
 
