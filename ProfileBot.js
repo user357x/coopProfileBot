@@ -5,6 +5,8 @@ const config = require('./config');
 const gql = new GraphQLClient(config.graphql);
 const db = require('./postgres')(config.postgres);
 const { onMessage, onInteractiveEvent, onError } = require('./handlers');
+const { questions, times, regions, statuses } = require('./data');
+const questionIds = Object.keys(questions);
 
 class ProfileBot extends Bot {
 
@@ -12,6 +14,54 @@ class ProfileBot extends Bot {
         super(...args);
         this.users = undefined;
         this.tasks = undefined;
+
+        this.timeMenuOptions = Object.keys(times).map((key, i) => {
+            return {
+                label: times[key].label,
+                value: times[key].value
+            }
+        });
+
+        this.timeMenuOptions.unshift({
+            label: 'выберите время',
+            value: 'default'
+        });
+
+        this.regionMenuOptions = Object.keys(regions).map((key, i) => {
+            return {
+                label: regions[key],
+                value: key
+            }
+        });
+
+        this.regionMenuOptions.unshift({
+            label: 'выберите регион',
+            value: 'default'
+        });
+
+        this.statusMenuOptions = Object.keys(statuses).map((key, i) => {
+            return {
+                label: statuses[key].label,
+                value: key
+            }
+        });
+
+        this.statusMenuOptions.unshift({
+            label: 'выберите статус',
+            value: 'default'
+        });
+
+        this.profileMenuOptions = Object.keys(questions).map((key, i) => {
+            return {
+                label: questions[key].label,
+                value: key
+            }
+        });
+
+        this.profileMenuOptions.unshift({
+            label: 'выберите поле',
+            value: 'default'
+        });
     }
 
     async start() {
@@ -66,11 +116,27 @@ class ProfileBot extends Bot {
         }, checkInterval);
     }
 
-    async sendNextQuestion(userId) {
-        const question = this.findCurrentQuestion(this.users.get(userId));
+    getNextQuestionId(extensions) {
+        return questionIds.find(id => !extensions[id]);
+    }
 
-        if (question) {
-            await this.sendTextMessage({ id: userId, type: 'user' }, question.text);
+    async sendNextQuestion(userId) {
+        const questionId = this.getNextQuestionId(this.users.get(userId).extensions);
+
+        if (questionId) {
+            switch (questionId) {
+                case 'region':
+                    await this.sendRegionMenu(userId, questions.region.text);
+                    break;
+
+                case 'status':
+                    await this.sendStatusMenu(userId, questions.status.text);
+                    break;
+
+                default:
+                    await this.sendTextMessage({ id: userId, type: 'user' }, questions[questionId].text);
+                    break;
+            }
             //await Promise.delay(1000);
         }
     }
@@ -115,31 +181,74 @@ class ProfileBot extends Bot {
                     actions: [
                         {
                             id: 'timeMenu',
+                            defaultValue: '0',
+                            widget: {
+                                type: 'select',
+                                options: this.timeMenuOptions
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
+    }
+
+    async sendRegionMenu(userId, text) {
+        await this.sendInteractiveMessage(
+            { id: userId, type: 'user' },
+            text,
+            [
+                {
+                    actions: [
+                        {
+                            id: 'regionMenu',
                             defaultValue: 'default',
                             widget: {
                                 type: 'select',
-                                options: [
-                                    {
-                                        label: 'выберите время',
-                                        value: 'default'
-                                    },
-                                    {
-                                        label: '1 час',
-                                        value: 'one_hour'
-                                    },
-                                    {
-                                        label: '3 часа',
-                                        value: 'three_hours'
-                                    },
-                                    {
-                                        label: '7 часов',
-                                        value: 'seven_hours'
-                                    },
-                                    {
-                                        label: '24 часа',
-                                        value: 'twenty_four_hours'
-                                    }
-                                ]
+                                options: this.regionMenuOptions
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
+    }
+
+    async sendStatusMenu(userId, text) {
+        await this.sendInteractiveMessage(
+            { id: userId, type: 'user' },
+            text,
+            [
+                {
+                    actions: [
+                        {
+                            id: 'statusMenu',
+                            defaultValue: 'default',
+                            widget: {
+                                type: 'select',
+                                options: this.statusMenuOptions
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
+    }
+
+    async sendProfileMenu(userId) {
+
+        await this.sendInteractiveMessage(
+            { id: userId, type: 'user' },
+            'Выберите позицию, которую хотите исправить',
+            [
+                {
+                    actions: [
+                        {
+                            id: 'profileMenu',
+                            defaultValue: 'default',
+                            widget: {
+                                type: 'select',
+                                options: this.profileMenuOptions
                             }
                         }
                     ]
@@ -214,16 +323,12 @@ class ProfileBot extends Bot {
             }`,
             variables: { uid, about }
         });
-        this.users.delete(uid);
+        //this.users.delete(uid);
     }
 
     async updateUserExtension(uid, key, value) {
         await this.removeUserExtension(uid, key);
         await this.addUserExtension(uid, key, value);
-    }
-
-    findCurrentQuestion(user) {
-        return config.questions.find((item) => !user.extensions[item.id]);
     }
 
     async setTask(userId, hours) {
