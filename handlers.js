@@ -146,9 +146,8 @@ exports.onInteractiveEvent = (bot) => {
             }
         },
 
-        timeMenu: (() => {
-            const timeMenuHandlers = {};
-            Object.keys(times).forEach(time => timeMenuHandlers[time] = async event => {
+        timeMenu: (() => Object.keys(times).reduce((obj, time) => {
+            obj[time] = async event => {
                 await bot.setTask(event.uid, parseInt(time));
                 await bot.sendTextMessage({
                     id: event.uid,
@@ -160,17 +159,16 @@ exports.onInteractiveEvent = (bot) => {
                     '',
                     []
                 );
-            });
-            return timeMenuHandlers;
-        })(),
+            };
+            return obj;
+        }, {}))(),
 
-        regionMenu: (() => {
-            const regionMenuHandlers = {};
-            Object.keys(regions).forEach(number => regionMenuHandlers[number] = async (event) => {
+        regionMenu: (() => Object.keys(regions).reduce((obj, region) => {
+            obj[region] = async event => {
                 await bot.updateUserExtension(
                     event.uid,
                     'region',
-                    regions[number]
+                    regions[region]
                 );
                 let isUpdate;
                 const user = bot.users.get(event.uid);
@@ -189,13 +187,12 @@ exports.onInteractiveEvent = (bot) => {
                     '',
                     []
                 );
-            });
-            return regionMenuHandlers;
-        })(),
+            };
+            return obj;
+        }, {}))(),
 
-        statusMenu: (() => {
-            const statusMenuHandlers = {};
-            Object.keys(statuses).forEach(status => statusMenuHandlers[status] = async (event) => {
+        statusMenu: (() => Object.keys(statuses).reduce((obj, status) => {
+            obj[status] = async event => {
                 await bot.updateUserExtension(
                     event.uid,
                     'status',
@@ -218,17 +215,14 @@ exports.onInteractiveEvent = (bot) => {
                     '',
                     []
                 );
-            });
-            return statusMenuHandlers;
-        })(),
+            };
+            return obj;
+        }, {}))(),
 
-        profileMenu: (() => {
-            const profileMenuHandlers = {};
-            Object.keys(questions).forEach(question => profileMenuHandlers[question] = async (event) => {
-
+        profileMenu: (() => Object.keys(questions).reduce((obj, question) => {
+            obj[question] = async event => {
                 bot.users.get(event.uid).updateExtension = question;
-
-                switch(question) {
+                switch (question) {
                     case 'region':
                         await bot.sendRegionMenu(event.uid, questions.region.shortText);
                         break;
@@ -238,7 +232,7 @@ exports.onInteractiveEvent = (bot) => {
                         break;
 
                     default:
-                        await bot.sendTextMessage({ id: event.uid, type: 'user' }, questions[question].shortText);
+                        await bot.sendTextMessage({id: event.uid, type: 'user'}, questions[question].shortText);
                         break;
                 }
                 await bot.editInteractiveMessage(
@@ -247,10 +241,9 @@ exports.onInteractiveEvent = (bot) => {
                     '',
                     []
                 );
-            });
-            return profileMenuHandlers;
-        })()
-
+            };
+            return obj;
+        }, {}))()
     };
 
     return async (event) => await handlers[event.id][event.value](event);
