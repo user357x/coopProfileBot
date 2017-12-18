@@ -181,7 +181,7 @@ class ProfileBot extends Bot {
                     actions: [
                         {
                             id: 'timeMenu',
-                            defaultValue: '0',
+                            defaultValue: 'default',
                             widget: {
                                 type: 'select',
                                 options: this.timeMenuOptions
