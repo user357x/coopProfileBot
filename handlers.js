@@ -123,11 +123,27 @@ exports.onInteractiveEvent = (bot) => {
     const handlers = {
 
         begin: {
-            begin: async event => bot.sendNextQuestion(event.uid),
+            begin: async event => {
+                await bot.sendNextQuestion(event.uid);
+                await bot.editInteractiveMessage(
+                    event.peer,
+                    event.rid,
+                    '',
+                    []
+                );
+            }
         },
 
         later: {
-            later: async event => bot.sendTimeMenu(event.uid),
+            later: async event => {
+                await bot.sendTimeMenu(event.uid);
+                await bot.editInteractiveMessage(
+                    event.peer,
+                    event.rid,
+                    '',
+                    []
+                );
+            }
         },
 
         timeMenu: (() => {
@@ -138,6 +154,12 @@ exports.onInteractiveEvent = (bot) => {
                     id: event.uid,
                     type: 'user'
                 }, times[time].answer);
+                await bot.editInteractiveMessage(
+                    event.peer,
+                    event.rid,
+                    '',
+                    []
+                );
             });
             return timeMenuHandlers;
         })(),
@@ -161,6 +183,12 @@ exports.onInteractiveEvent = (bot) => {
                 else {
                     await bot.sendNextQuestion(event.uid)
                 }
+                await bot.editInteractiveMessage(
+                    event.peer,
+                    event.rid,
+                    '',
+                    []
+                );
             });
             return regionMenuHandlers;
         })(),
@@ -184,6 +212,12 @@ exports.onInteractiveEvent = (bot) => {
                 else {
                     await bot.sendNextQuestion(event.uid)
                 }
+                await bot.editInteractiveMessage(
+                    event.peer,
+                    event.rid,
+                    '',
+                    []
+                );
             });
             return statusMenuHandlers;
         })(),
@@ -207,7 +241,12 @@ exports.onInteractiveEvent = (bot) => {
                         await bot.sendTextMessage({ id: event.uid, type: 'user' }, questions[question].shortText);
                         break;
                 }
-
+                await bot.editInteractiveMessage(
+                    event.peer,
+                    event.rid,
+                    '',
+                    []
+                );
             });
             return profileMenuHandlers;
         })()
